@@ -1,0 +1,118 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  BEHIND_SCHEDULE
+  PAUSED
+}
+
+enum TaskDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  passwordHash  String
+  name          String
+  currentStreak Int               @default(0)
+  longestStreak Int               @default(0)
+  lastActiveAt  DateTime          @default(now())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  goals         Goal[]
+  notifications NotificationLog[]
+
+  @@map("users")
+}
+
+model Goal {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  targetDate  DateTime
+  dailyHours  Float      @default(2.0)
+  status      GoalStatus @default(IN_PROGRESS)
+  createdAt   DateTime   @default(now())
+
+  roadmap     Roadmap?
+
+  @@map("goals")
+}
+
+model Roadmap {
+  id         String      @id @default(uuid())
+  goalId     String      @unique
+  goal       Goal        @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  summary    String
+  totalDays  Int
+  createdAt  DateTime    @default(now())
+
+  milestones Milestone[]
+
+  @@map("roadmaps")
+}
+
+model Milestone {
+  id         String      @id @default(uuid())
+  roadmapId  String
+  roadmap    Roadmap     @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+  title      String
+  orderIndex Int
+  
+  dailyTasks DailyTask[]
+
+  @@map("milestones")
+}
+
+model DailyTask {
+  id            String         @id @default(uuid())
+  milestoneId   String
+  milestone     Milestone      @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  dayNumber     Int
+  title         String
+  description   String
+  resourceUrl   String?
+  estimatedMins Int            @default(30)
+  difficulty    TaskDifficulty @default(MEDIUM)
+  isCompleted   Boolean        @default(false)
+  completedAt   DateTime?
+
+  progressLogs  UserProgress[]
+
+  @@map("daily_tasks")
+}
+
+model UserProgress {
+  id           String    @id @default(uuid())
+  taskId       String
+  task         DailyTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userFeedback String?
+  createdAt    DateTime  @default(now())
+
+  @@map("user_progress")
+}
+
+model NotificationLog {
+  id      String   @id @default(uuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel String
+  status  String
+  sentAt  DateTime @default(now())
+
+  @@map("notification_logs")
+}
