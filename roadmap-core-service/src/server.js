@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const roadmapRoutes = require('./routes/roadmapRoutes');
-const prisma = require('./prisma');
+const prisma = require('./config/prisma');
 
 const app = express();
 const PORT = process.env.PORT || 5002;
@@ -44,7 +44,8 @@ app.use((req, res) => {
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled Core Service Error:', err);
-  res.status(err.status || 500).json({
+  const status = err.statusCode || err.status || 500;
+  res.status(status).json({
     error: err.message || 'Internal Core Service Error',
   });
 });
