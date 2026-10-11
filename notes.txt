@@ -1,0 +1,38 @@
+ohk tell me how this ai looks like how the information will flow in this how many agents will work inside this 
+22:36
+Here is the complete architectural breakdown of how the AI Orchestration System works, how information flows through it, and the specialized agents involved.
+
+🧠 1. High-Level AI Architecture & Flow
+mermaid
+graph TD
+    User([User Prompt: 'Master React in 30 Days, 2hrs/day']) --> Gateway[API Gateway :5050]
+    Gateway --> AIOrchestrator[AI Orchestrator Service :5001]
+    
+    subgraph "AI Orchestration Pipeline"
+        AIOrchestrator --> CacheCheck{Redis Cache Check<br/>roadmap:cache:hash}
+        CacheCheck -- "Cache Hit (<15ms)" --> ReturnCached[Return Cached Roadmap]
+        
+        CacheCheck -- "Cache Miss" --> AgentPipeline[Agentic Generation Pipeline]
+        
+        subgraph "Specialized AI Agents (Gemini + LangChain)"
+            AgentPipeline --> Agent1[1. Roadmap Architect Agent<br/>Defines Milestones & Timeline]
+            Agent1 --> Agent2[2. Micro-Task Decomposer Agent<br/>Generates 15-30 min Atomic Tasks]
+            Agent2 --> Agent3[3. Resource Curator Agent<br/>Attaches Verified Docs & Links]
+        end
+        
+        Agent3 --> Guardrail[4. Schema Validator & Guardrail<br/>Zod JSON Validation]
+        Guardrail --> SaveCache[(Store in Redis<br/>TTL: 7 Days)]
+    end
+    
+    SaveCache --> CoreService[Roadmap Core Service :5002]
+    ReturnCached --> CoreService
+    CoreService --> Postgres[(PostgreSQL 16 DB<br/>Goals, Milestones, Tasks)]
+    CoreService --> Gateway --> Client([React 18 Visual Graph])
+🤖 2. How Many Agents Work Inside the AI System?
+Instead of relying on one generic, hallucination-prone prompt, PathPilot uses a 3 + 1 Specialized Multi-Role Agent Pipeline:
+
+#	Agent Name	Core Responsibility	Output
+1	Roadmap Architect Agent	-----Analyzes the student's high-level goal, skill level, daily bandwidth (e.g., 2 hrs/day), and target days to build structured weekly milestones.	High-level weekly phases & progression milestones.
+2	Micro-Task Decomposer Agent	------Slices each milestone into 15–30 minute bite-sized atomic daily tasks with difficulty ratings (EASY, MEDIUM, HARD).	Discrete daily actionable tasks (Day 1 to Day N).
+3	Resource Curator Agent------	Pairs every daily task with curated documentation links (e.g., official docs, tutorials) to eliminate search fatigue.	Verified learning URLs & contextual task notes.
+4	Adaptive Rebalancer Agent (Triggered on Delay)-------	Activates when a student falls behind by 2–3 days. Rebalances future incomplete tasks across the remaining timeline without touching completed history.	Recalculated timeline & dynamic task schedule.
