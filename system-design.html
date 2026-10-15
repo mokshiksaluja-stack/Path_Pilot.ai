@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>PathPilot AI — System Design HLD</title>
+<style>
+:root{--bg:#080c14;--bg2:#0d1420;--bg3:#111927;--border:rgba(99,179,237,0.15);--blue:#63b3ed;--blue-glow:rgba(99,179,237,0.25);--purple:#b794f4;--purple-glow:rgba(183,148,244,0.25);--green:#68d391;--green-glow:rgba(104,211,145,0.25);--orange:#f6ad55;--orange-glow:rgba(246,173,85,0.25);--red:#fc8181;--red-glow:rgba(252,129,129,0.25);--cyan:#76e4f7;--cyan-glow:rgba(118,228,247,0.25);--yellow:#faf089;--text:#e2e8f0;--text-muted:#718096;--radius:12px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 20% 10%,rgba(99,179,237,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 80%,rgba(183,148,244,0.06) 0%,transparent 60%);pointer-events:none;z-index:0}
+.page{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:40px 24px 80px}
+.header{text-align:center;margin-bottom:60px}
+.badge{display:inline-block;background:linear-gradient(135deg,var(--blue-glow),var(--purple-glow));border:1px solid var(--border);border-radius:20px;padding:6px 18px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:16px}
+h1{font-size:clamp(32px,5vw,56px);font-weight:800;background:linear-gradient(135deg,#fff 30%,var(--blue) 70%,var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;margin-bottom:12px}
+.sub{color:var(--text-muted);font-size:16px;max-width:600px;margin:0 auto;line-height:1.6}
+.tag{display:inline-block;padding:2px 10px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:0.5px;border:1px solid}
+.section-title{font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin:40px 0 18px;display:flex;align-items:center;gap:10px}
+.section-title::before{content:'';flex:0 0 24px;height:2px;background:currentColor;border-radius:2px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+/* ARCH CANVAS */
+.arch-canvas{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:32px;margin-bottom:48px;position:relative;overflow:hidden}
+.arch-canvas::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(99,179,237,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(99,179,237,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.tier-sep{display:flex;align-items:center;gap:12px;margin:18px 0}
+.tier-sep-line{flex:1;height:1px;background:var(--border)}
+.tier-sep-text{font-size:9px;letter-spacing:2px;text-transform:uppercase;white-space:nowrap;padding:3px 10px;border:1px solid var(--border);border-radius:20px;color:var(--text-muted)}
+.tier{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
+.svc{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 20px;border-radius:12px;border:1.5px solid;min-width:150px;max-width:210px;text-align:center;position:relative;cursor:default;transition:transform .25s,box-shadow .25s}
+.svc:hover{transform:translateY(-4px)}
+.svc-icon{font-size:26px}
+.svc-name{font-size:12px;font-weight:700}
+.svc-sub{font-size:10px;color:var(--text-muted);line-height:1.4}
+.svc-port{position:absolute;top:-10px;right:-10px;background:var(--bg);border:1px solid currentColor;border-radius:8px;padding:2px 7px;font-size:9px;font-weight:700}
+.svc-badge{font-size:9px;padding:2px 8px;border-radius:6px;font-weight:600}
+.blue{border-color:var(--blue);background:rgba(99,179,237,0.07);color:var(--blue)}.blue:hover{box-shadow:0 8px 32px var(--blue-glow)}
+.purple{border-color:var(--purple);background:rgba(183,148,244,0.07);color:var(--purple)}.purple:hover{box-shadow:0 8px 32px var(--purple-glow)}
+.green{border-color:var(--green);background:rgba(104,211,145,0.07);color:var(--green)}.green:hover{box-shadow:0 8px 32px var(--green-glow)}
+.orange{border-color:var(--orange);background:rgba(246,173,85,0.07);color:var(--orange)}.orange:hover{box-shadow:0 8px 32px var(--orange-glow)}
+.red{border-color:var(--red);background:rgba(252,129,129,0.07);color:var(--red)}.red:hover{box-shadow:0 8px 32px var(--red-glow)}
+.cyan-c{border-color:var(--cyan);background:rgba(118,228,247,0.07);color:var(--cyan)}.cyan-c:hover{box-shadow:0 8px 32px var(--cyan-glow)}
+.arrow-wrap{display:flex;justify-content:center;align-items:center;margin:8px 0;gap:8px}
+.arrow-down{display:flex;flex-direction:column;align-items:center}
+.arrow-down .line{width:2px;height:28px;background:var(--border)}
+.arrow-down .tip{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid var(--border)}
+.arrow-label{font-size:9px;color:var(--text-muted);background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;white-space:nowrap}
+/* FLOW DIAGRAMS */
+.flow-diagram{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+.flow-title{font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.fnum{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+.flow-steps{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.step{padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid;white-space:nowrap}
+.sarrow{font-size:14px;color:var(--text-muted)}
+/* LANGGRAPH */
+.lg-pipeline{display:flex;align-items:center;overflow-x:auto;padding-bottom:8px;margin-bottom:12px}
+.lg-node{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:110px;padding:12px 10px;border-radius:10px;border:1.5px solid;text-align:center;flex-shrink:0}
+.lg-edge{display:flex;flex-direction:column;align-items:center;min-width:55px;flex-shrink:0}
+.lg-edge-line{width:100%;height:2px;background:var(--border)}
+.lg-edge-label{font-size:9px;color:var(--text-muted);margin-top:2px;white-space:nowrap}
+.lg-edge-arrow{font-size:9px;color:var(--text-muted)}
+/* REDIS TABLE */
+.rtable{width:100%;border-collapse:collapse;font-size:12px}
+.rtable th{background:var(--bg3);color:var(--text-muted);font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:10px;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+.rtable td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top}
+.rtable tr:hover td{background:rgba(255,255,255,0.02)}
+.cp{font-family:monospace;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;color:var(--cyan)}
+/* DB SCHEMA */
+.schema-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:48px}
+.st{background:var(--bg3);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.st-head{padding:10px 14px;font-size:12px;font-weight:700}
+.sf{padding:5px 14px;font-size:11px;border-top:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;align-items:center;font-family:monospace}
+.stype{color:var(--text-muted);font-size:10px}
+.pk{color:var(--yellow)}.fk{color:var(--orange)}
+/* API CONTRACTS */
+.api-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.api-row:last-child{border-bottom:none}
+.method{font-size:10px;font-weight:800;letter-spacing:1px;padding:3px 8px;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.mpost{background:rgba(104,211,145,0.15);color:var(--green);border:1px solid var(--green)}
+.mget{background:rgba(99,179,237,0.15);color:var(--blue);border:1px solid var(--blue)}
+.api-path{font-family:monospace;font-size:12px;font-weight:600}
+.api-desc{font-size:11px;color:var(--text-muted);margin-top:3px}
+/* TECH STACK */
+.tech-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px;margin-bottom:48px}
+.tech-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;transition:border-color .3s,transform .2s}
+.tech-card:hover{border-color:var(--blue);transform:translateY(-2px)}
+.tc-icon{font-size:22px;margin-bottom:6px}
+.tc-name{font-size:12px;font-weight:700;margin-bottom:3px}
+.tc-role{font-size:11px;color:var(--text-muted);line-height:1.4}
+.tc-pkg{font-size:10px;color:var(--cyan);font-family:monospace;margin-top:5px}
+/* TRADEOFFS */
+.trtable{width:100%;border-collapse:collapse;font-size:12px}
+.trtable th{background:var(--bg3);color:var(--text-muted);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border)}
+.trtable td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top;line-height:1.5}
+.trtable tr:hover td{background:rgba(255,255,255,0.02)}
+/* LAYERS */
+.layer-stack{display:flex;flex-direction:column;gap:6px}
+.layer-row{display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:8px;border:1px solid;cursor:default;transition:transform .2s}
+.layer-row:hover{transform:translateX(4px)}
+.l-name{font-size:12px;font-weight:700;min-width:110px}
+.l-desc{font-size:11px;color:var(--text-muted)}
+.l-file{font-family:monospace;font-size:10px;margin-left:auto}
+/* NFR */
+.nfr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:48px}
+.nfr-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px}
+.nfr-title{font-size:13px;font-weight:700;margin-bottom:8px}
+.nfr-list{list-style:none;padding:0}
+.nfr-list li{font-size:11px;color:var(--text-muted);padding:3px 0 3px 14px;position:relative;line-height:1.4}
+.nfr-list li::before{content:'→';position:absolute;left:0;color:var(--green)}
+/* FOOTER */
+.footer{text-align:center;margin-top:80px;padding-top:32px;border-top:1px solid var(--border);color:var(--text-muted);font-size:12px}
+/* SCROLL */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+/* CARD */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;transition:border-color .3s,box-shadow .3s}
+.card:hover{border-color:var(--blue);box-shadow:0 0 24px var(--blue-glow)}
+/* TIER LEGEND */
+.tier-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+.tier-pill{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:11px;font-weight:600}
+.t-dot{width:8px;height:8px;border-radius:50%}
+/* NAV */
+.nav{position:fixed;top:20px;right:20px;background:rgba(13,20,32,0.88);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:12px;padding:12px;z-index:100;display:flex;flex-direction:column;gap:3px}
+.nav a{font-size:10px;color:var(--text-muted);text-decoration:none;padding:4px 8px;border-radius:6px;transition:background .2s,color .2s;letter-spacing:0.5px}
+.nav a:hover{background:var(--border);color:var(--text)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+@media(max-width:700px){.nav{display:none}}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="#overview">Overview</a>
+  <a href="#arch">Architecture</a>
+  <a href="#flows">Data Flows</a>
+  <a href="#langgraph">LangGraph</a>
+  <a href="#database">Database</a>
+  <a href="#redis">Redis</a>
+  <a href="#api">API Contracts</a>
+  <a href="#layers">Clean Arch</a>
+  <a href="#techstack">Tech Stack</a>
+  <a href="#tradeoffs">Trade-offs</a>
+  <a href="#nfr">NFRs</a>
+</nav>
+
+<div class="page">
+
+<!-- HEADER -->
+<div class="header reveal" id="overview">
+  <div class="badge">🚀 High-Level System Design</div>
+  <h1>PathPilot AI</h1>
+  <p class="sub">Adaptive Agentic Learning Acceleration Platform — Distributed Microservices powered by Google Gemini 2.5 Flash, LangGraph, Redis &amp; BullMQ</p>
+  <div style="margin-top:20px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+    <span class="tag" style="background:rgba(104,211,145,0.1);color:var(--green);border-color:var(--green)">5 Microservices</span>
+    <span class="tag" style="background:rgba(99,179,237,0.1);color:var(--blue);border-color:var(--blue)">Multi-Agent LangGraph</span>
+    <span class="tag" style="background:rgba(183,148,244,0.1);color:var(--purple);border-color:var(--purple)">&lt;15ms Cache</span>
+    <span class="tag" style="background:rgba(246,173,85,0.1);color:var(--orange);border-color:var(--orange)">Docker Compose</span>
+    <span class="tag" style="background:rgba(118,228,247,0.1);color:var(--cyan);border-color:var(--cyan)">Gemini 2.5 Flash</span>
+  </div>
+</div>
+
+<!-- TIER LEGEND -->
+<div class="tier-legend reveal">
+  <div class="tier-pill"><div class="t-dot" style="background:var(--blue)"></div>Frontend</div>
+  <div class="tier-pill"><div class="t-dot" style="background:var(--orange)"></div>API &amp; Auth</div>
+  <div class="tier-pill"><div class="t-dot" style="background:var(--purple)"></div>Application Services</div>
+  <div class="tier-pill"><div class="t-dot" style="background:var(--green)"></div>AI Orchestration</div>
+  <div class="tier-pill"><div class="t-dot" style="background:var(--red)"></div>Infrastructure</div>
+  <div class="tier-pill"><div class="t-dot" style="background:var(--cyan)"></div>External API</div>
+</div>
+
+<!-- ARCHITECTURE -->
+<div id="arch">
+  <div class="section-title reveal">System Architecture — 4-Tier Microservices</div>
+  <div class="arch-canvas reveal">
+
+    <div class="tier-sep"><div class="tier-sep-line"></div><div class="tier-sep-text" style="color:var(--blue)">Tier 0 — Client (Browser)</div><div class="tier-sep-line"></div></div>
+    <div class="tier">
+      <div class="svc blue">
+        <div class="svc-port" style="color:var(--blue)">:3000</div>
+        <div class="svc-icon">🖥️</div>
+        <div class="svc-name">React 18 SPA</div>
+        <div class="svc-sub">Vite · Tailwind CSS · React Flow · Lucide Icons</div>
+        <div class="svc-badge" style="background:rgba(99,179,237,0.15);color:var(--blue);border:1px solid var(--blue)">client/</div>
+      </div>
+    </div>
+
+    <div class="arrow-wrap" style="margin:10px 0">
+      <div class="arrow-down"><div class="line"></div><div class="tip"></div></div>
+      <span class="arrow-label">HTTP/REST · JWT Bearer</span>
+      <div class="arrow-down"><div class="line"></div><div class="tip"></div></div>
+    </div>
+
+    <div class="tier-sep"><div class="tier-sep-line"></div><div class="tier-sep-text" style="color:var(--orange)">Tier 1 — API Gateway &amp; Auth</div><div class="tier-sep-line"></div></div>
+    <div class="tier">
+      <div class="svc orange" style="max-width:260px">
+        <div class="svc-port" style="color:var(--orange)">:5050</div>
+        <div class="svc-icon">🛡️</div>
+        <div class="svc-name">API Gateway</div>
+        <div class="svc-sub">Node.js · Express · JWT · Helmet · CORS · Redis Token-Bucket (10 req/min)</div>
+        <div class="svc-badge" style="background:rgba(246,173,85,0.15);color:var(--orange);border:1px solid var(--orange)">api-gateway/</div>
+      </div>
+    </div>
+
+    <div class="arrow-wrap" style="gap:50px;margin:10px 0">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div class="arrow-down"><div class="line"></div><div class="tip"></div></div>
+        <span class="arrow-label">/api/v1/*</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div class="arrow-down"><div class="line"></div><div class="tip"></div></div>
+        <span class="arrow-label">/ai/v1/*</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div class="arrow-down"><div class="line"></div><div class="tip"></div></div>
+        <span class="arrow-label">BullMQ Publish</span>
+      </div>
+    </div>
+
+    <div class="tier-sep"><div class="tier-sep-line"></div><div class="tier-sep-text" style="color:var(--purple)">Tier 2 — Application &amp; AI Services</div><div class="tier-sep-line"></div></div>
+    <div class="tier">
+      <div class="svc purple">
+        <div class="svc-port" style="color:var(--purple)">:5002</div>
+        <div class="svc-icon">📦</div>
+        <div class="svc-name">Roadmap Core</div>
+        <div class="svc-sub">Node.js · Express · Prisma ORM · Clean Architecture (routes→ctrl→svc→repo)</div>
+        <div class="svc-badge" style="background:rgba(183,148,244,0.15);color:var(--purple);border:1px solid var(--purple)">roadmap-core-service/</div>
+      </div>
+      <div class="svc green">
+        <div class="svc-port" style="color:var(--green)">:5001</div>
+        <div class="svc-icon">🤖</div>
+        <div class="svc-name">AI Orchestrator</div>
+        <div class="svc-sub">Python 3.12 · FastAPI · LangGraph · Pydantic · Gemini</div>
+        <div class="svc-badge" style="background:rgba(104,211,145,0.15);color:var(--green);border:1px solid var(--green)">ai-orchestrator-service/</div>
+      </div>
+      <div class="svc red">
+        <div class="svc-icon">⚙️</div>
+        <div class="svc-name">Notification Worker</div>
+        <div class="svc-sub">Node.js · BullMQ Consumer · Nodemailer · WhatsApp Gateway</div>
+        <div class="svc-badge" style="background:rgba(252,129,129,0.15);color:var(--red);border:1px solid var(--red)">notification-worker/</div>
+      </div>
+    </div>
+
+    <div class="arrow-wrap" style="gap:32px;flex-wrap:wrap;margin:10px 0">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div class="arrow-down"><div class="line"></div><div class="tip"></div></div><span class="arrow-label">Prisma $transaction</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div class="arrow-down"><div class="line"></div><div class="tip"></div></div><span class="arrow-label">ioredis · roadmap:cache:&lt;hash&gt;</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div class="arrow-down"><div class="line"></div><div class="tip"></div></div><span class="arrow-label">BullMQ · daily_reminder_queue</span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div class="arrow-down"><div class="line"></div><div class="tip"></div></div><span class="arrow-label">Gemini SDK · LLM Calls</span></div>
+    </div>
+
+    <div class="tier-sep"><div class="tier-sep-line"></div><div class="tier-sep-text" style="color:var(--red)">Tier 3 — Storage &amp; Infrastructure (Docker Compose)</div><div class="tier-sep-line"></div></div>
+    <div class="tier" style="gap:20px">
+      <div class="svc red" style="min-width:175px">
+        <div class="svc-port" style="color:var(--red)">:5432</div>
+        <div class="svc-icon">🐘</div>
+        <div class="svc-name">PostgreSQL 16</div>
+        <div class="svc-sub">Alpine · Persistent Volume · Relational DB</div>
+        <div class="svc-badge" style="background:rgba(252,129,129,0.15);color:var(--red);border:1px solid var(--red)">postgres-db</div>
+      </div>
+      <div class="svc orange" style="min-width:175px">
+        <div class="svc-port" style="color:var(--orange)">:6379</div>
+        <div class="svc-icon">⚡</div>
+        <div class="svc-name">Redis 7</div>
+        <div class="svc-sub">Alpine · Broker + Cache · BullMQ + 7-Day TTL</div>
+        <div class="svc-badge" style="background:rgba(246,173,85,0.15);color:var(--orange);border:1px solid var(--orange)">redis-broker</div>
+      </div>
+      <div class="svc cyan-c" style="min-width:175px">
+        <div class="svc-icon">☁️</div>
+        <div class="svc-name">Gemini 2.5 Flash</div>
+        <div class="svc-sub">Google AI · Structured Outputs · gemini-2.5-flash</div>
+        <div class="svc-badge" style="background:rgba(118,228,247,0.15);color:var(--cyan);border:1px solid var(--cyan)">External API</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DATA FLOWS -->
+<div id="flows">
+  <div class="section-title reveal">End-to-End Data Flows</div>
+
+  <div class="flow-diagram reveal">
+    <div class="flow-title"><div class="fnum" style="background:rgba(99,179,237,0.2);color:var(--blue)">A</div>Roadmap Generation — Cache Hit / Miss Flow</div>
+    <div class="flow-steps">
+      <div class="step" style="border-color:var(--blue);color:var(--blue)">👤 User</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--orange);color:var(--orange)">POST /ai/v1/generate-roadmap<br><span style="font-weight:400;color:var(--text-muted)">Gateway: JWT + Rate Limit</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--green);color:var(--green)">AI Orchestrator<br><span style="font-weight:400;color:var(--text-muted)">SHA-256 hash(goal+days+hours)</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--orange);color:var(--orange)">Redis GET<br><span style="font-weight:400;color:var(--text-muted)">roadmap:cache:&lt;hash&gt;</span></div>
+    </div>
+    <div style="display:flex;gap:20px;margin-top:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:10px;color:var(--green);font-weight:700;margin-bottom:8px;letter-spacing:1px">✅ CACHE HIT</div>
+        <div class="flow-steps">
+          <div class="step" style="border-color:var(--green);color:var(--green)">Return JSON</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--blue);color:var(--blue)">Client &lt;15ms ⚡</div>
+        </div>
+      </div>
+      <div style="flex:2;min-width:260px">
+        <div style="font-size:10px;color:var(--orange);font-weight:700;margin-bottom:8px;letter-spacing:1px">❌ CACHE MISS → LangGraph Pipeline</div>
+        <div class="flow-steps" style="flex-wrap:wrap">
+          <div class="step" style="border-color:var(--purple);color:var(--purple)">Architect</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--purple);color:var(--purple)">Decomposer</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--purple);color:var(--purple)">Curator</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--cyan);color:var(--cyan)">Gemini API</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--red);color:var(--red)">Reviewer (Critic)</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--orange);color:var(--orange)">Redis SET 7-Day TTL</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--red);color:var(--red)">Postgres $transaction</div><div class="sarrow">→</div>
+          <div class="step" style="border-color:var(--blue);color:var(--blue)">201 Created</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-diagram reveal">
+    <div class="flow-title"><div class="fnum" style="background:rgba(104,211,145,0.2);color:var(--green)">B</div>Daily Task Completion &amp; Streak Engine</div>
+    <div class="flow-steps" style="flex-wrap:wrap">
+      <div class="step" style="border-color:var(--blue);color:var(--blue)">👤 User marks done</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--orange);color:var(--orange)">POST /api/v1/tasks/:id/complete<br><span style="font-weight:400;color:var(--text-muted)">{feedback:"EASY"}</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--purple);color:var(--purple)">Controller → Service: completeTask()</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--purple);color:var(--purple)">Prisma $transaction<br><span style="font-weight:400;color:var(--text-muted)">DailyTask + UserProgress + User streak</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--orange);color:var(--orange)">Redis INCR user:streak:&lt;id&gt;</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--green);color:var(--green)">200 OK · currentStreak: 6 🔥</div>
+    </div>
+  </div>
+
+  <div class="flow-diagram reveal">
+    <div class="flow-title"><div class="fnum" style="background:rgba(183,148,244,0.2);color:var(--purple)">C</div>Adaptive Re-Scheduling — "Fell Behind" Flow</div>
+    <div class="flow-steps" style="flex-wrap:wrap">
+      <div class="step" style="border-color:var(--blue);color:var(--blue)">📉 User behind 3 days</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--orange);color:var(--orange)">POST /api/v1/goals/:id/re-adapt<br><span style="font-weight:400;color:var(--text-muted)">{reason:"midterms"}</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--green);color:var(--green)">AI Orchestrator · Re-Planning Agent</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--red);color:var(--red)">⚠️ Gemini: recalculate future tasks ONLY<br><span style="font-weight:400;color:var(--text-muted)">Completed history preserved</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--purple);color:var(--purple)">Prisma batch update future DailyTasks</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--green);color:var(--green)">200 OK · New schedule</div>
+    </div>
+  </div>
+
+  <div class="flow-diagram reveal">
+    <div class="flow-title"><div class="fnum" style="background:rgba(252,129,129,0.2);color:var(--red)">D</div>Async Background Notification Pipeline (BullMQ)</div>
+    <div class="flow-steps" style="flex-wrap:wrap">
+      <div class="step" style="border-color:var(--text-muted);color:var(--text-muted)">⏰ Cron Scheduler</div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--orange);color:var(--orange)">Redis BullMQ<br><span style="font-weight:400;color:var(--text-muted)">daily_reminder_queue</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--red);color:var(--red)">Notification Worker<br><span style="font-weight:400;color:var(--text-muted)">Consumes job</span></div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--purple);color:var(--purple)">Query Postgres<br><span style="font-weight:400;color:var(--text-muted)">incomplete tasks</span></div><div class="sarrow">→</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div class="step" style="border-color:var(--cyan);color:var(--cyan)">📧 Nodemailer</div>
+        <div class="step" style="border-color:var(--green);color:var(--green)">💬 WhatsApp</div>
+      </div><div class="sarrow">→</div>
+      <div class="step" style="border-color:var(--red);color:var(--red)">Log NotificationLog<br><span style="font-weight:400;color:var(--text-muted)">SENT / FAILED</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- LANGGRAPH -->
+<div id="langgraph">
+  <div class="section-title reveal">LangGraph Multi-Agent StateGraph Pipeline</div>
+  <div class="card reveal" style="margin-bottom:48px">
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px;line-height:1.6">The AI Orchestrator runs a <strong style="color:var(--green)">LangGraph StateGraph</strong> — 4 specialist nodes sharing a <code style="color:var(--cyan)">GraphState TypedDict</code>. Powered by <strong style="color:var(--cyan)">Google Gemini 2.5 Flash</strong> with <strong style="color:var(--purple)">Pydantic structured outputs</strong>. A Reviewer (Critic) enforces a self-correction loop capped at 2 retries.</p>
+    <div class="lg-pipeline">
+      <div class="lg-node" style="border-color:var(--orange);background:rgba(246,173,85,0.07)">
+        <div style="font-size:18px">📥</div>
+        <div style="font-size:10px;font-weight:700;color:var(--orange)">FastAPI<br>Entry</div>
+        <div style="font-size:9px;color:var(--text-muted)">POST /ai/v1/<br>generate-roadmap</div>
+      </div>
+      <div class="lg-edge"><div class="lg-edge-line"></div><div class="lg-edge-label">Cache Miss</div><div class="lg-edge-arrow">▶</div></div>
+      <div class="lg-node" style="border-color:var(--blue);background:rgba(99,179,237,0.07)">
+        <div style="font-size:18px">🏗️</div>
+        <div style="font-size:10px;font-weight:700;color:var(--blue)">Architect<br>Node</div>
+        <div style="font-size:9px;color:var(--text-muted)">Milestone Curriculum<br>Planner</div>
+      </div>
+      <div class="lg-edge"><div class="lg-edge-line"></div><div class="lg-edge-label">milestones[]</div><div class="lg-edge-arrow">▶</div></div>
+      <div class="lg-node" style="border-color:var(--purple);background:rgba(183,148,244,0.07)">
+        <div style="font-size:18px">✂️</div>
+        <div style="font-size:10px;font-weight:700;color:var(--purple)">Decomposer<br>Node</div>
+        <div style="font-size:9px;color:var(--text-muted)">15-30 min Atomic<br>Task Slicer</div>
+      </div>
+      <div class="lg-edge"><div class="lg-edge-line"></div><div class="lg-edge-label">formatted_tasks[]</div><div class="lg-edge-arrow">▶</div></div>
+      <div class="lg-node" style="border-color:var(--cyan);background:rgba(118,228,247,0.07)">
+        <div style="font-size:18px">🔗</div>
+        <div style="font-size:10px;font-weight:700;color:var(--cyan)">Curator<br>Node</div>
+        <div style="font-size:9px;color:var(--text-muted)">Verified Docs &amp;<br>Resource URLs</div>
+      </div>
+      <div class="lg-edge"><div class="lg-edge-line"></div><div class="lg-edge-label">verified_resources[]</div><div class="lg-edge-arrow">▶</div></div>
+      <div class="lg-node" style="border-color:var(--red);background:rgba(252,129,129,0.07)">
+        <div style="font-size:18px">🔍</div>
+        <div style="font-size:10px;font-weight:700;color:var(--red)">Reviewer<br>(Critic)</div>
+        <div style="font-size:9px;color:var(--text-muted)">Time Budget<br>Audit</div>
+      </div>
+      <div class="lg-edge"><div class="lg-edge-line"></div><div class="lg-edge-label">review_passed</div><div class="lg-edge-arrow">▶</div></div>
+      <div class="lg-node" style="border-color:var(--green);background:rgba(104,211,145,0.07)">
+        <div style="font-size:18px">✅</div>
+        <div style="font-size:10px;font-weight:700;color:var(--green)">Cache &amp;<br>Persist</div>
+        <div style="font-size:9px;color:var(--text-muted)">Redis TTL<br>+ Postgres</div>
+      </div>
+    </div>
+    <div style="background:rgba(252,129,129,0.06);border:1px solid rgba(252,129,129,0.2);border-radius:10px;padding:14px 16px;margin-top:4px">
+      <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px">🔄 Self-Correction Loop (Conditional Routing via router.py)</div>
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.7">
+        <strong style="color:var(--text)">Reviewer fails</strong> (tasks exceed <code style="color:var(--cyan)">daily_hours</code> budget)
+        → <code style="color:var(--orange)">route_after_review()</code> checks <code style="color:var(--yellow)">retry_count</code>
+        → If <code style="color:var(--yellow)">retry_count &lt; 2</code>: route back to <strong style="color:var(--purple)">Decomposer</strong> for self-correction
+        → If <code style="color:var(--red)">retry_count ≥ 2</code>: <strong style="color:var(--red)">Circuit Breaker fires</strong> → return best output (API budget protection)
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">GraphState TypedDict — Shared Memory Across All Nodes</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        <span class="cp">user_query</span><span class="cp">target_days</span><span class="cp">daily_hours</span><span class="cp">skill_level</span><span class="cp">roadmap_summary</span><span class="cp">milestones: list[dict]</span><span class="cp">formatted_tasks: list[dict]</span><span class="cp">verified_resources: list[dict]</span><span class="cp">review_passed: bool</span><span class="cp">review_feedback: str</span><span class="cp">retry_count: int</span><span class="cp">final_roadmap: dict</span><span class="cp">error_message: str</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DATABASE SCHEMA -->
+<div id="database">
+  <div class="section-title reveal">Database Schema — PostgreSQL 16 via Prisma ORM</div>
+  <div class="schema-grid reveal">
+    <div class="st">
+      <div class="st-head" style="background:rgba(99,179,237,0.1);color:var(--blue)">👤 User</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK · uuid()</span></div>
+      <div class="sf"><span>email</span><span class="stype">String · UNIQUE</span></div>
+      <div class="sf"><span>passwordHash</span><span class="stype">String</span></div>
+      <div class="sf"><span>name</span><span class="stype">String</span></div>
+      <div class="sf"><span style="color:var(--green)">currentStreak</span><span class="stype">Int · 0</span></div>
+      <div class="sf"><span style="color:var(--green)">longestStreak</span><span class="stype">Int · 0</span></div>
+      <div class="sf"><span>lastActiveAt</span><span class="stype">DateTime</span></div>
+      <div class="sf"><span class="fk">goals[]</span><span class="stype">Goal[]</span></div>
+      <div class="sf"><span class="fk">notifications[]</span><span class="stype">NotifLog[]</span></div>
+    </div>
+    <div class="st">
+      <div class="st-head" style="background:rgba(183,148,244,0.1);color:var(--purple)">🎯 Goal</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK</span></div>
+      <div class="sf"><span class="fk">userId</span><span class="stype">FK → User</span></div>
+      <div class="sf"><span>title</span><span class="stype">String</span></div>
+      <div class="sf"><span>description</span><span class="stype">String?</span></div>
+      <div class="sf"><span>targetDate</span><span class="stype">DateTime</span></div>
+      <div class="sf"><span>dailyHours</span><span class="stype">Float · 2.0</span></div>
+      <div class="sf"><span style="color:var(--orange)">status</span><span class="stype">GoalStatus enum</span></div>
+      <div class="sf"><span class="fk">roadmap?</span><span class="stype">Roadmap?</span></div>
+    </div>
+    <div class="st">
+      <div class="st-head" style="background:rgba(104,211,145,0.1);color:var(--green)">🗺️ Roadmap</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK</span></div>
+      <div class="sf"><span class="fk">goalId</span><span class="stype">FK · UNIQUE → Goal</span></div>
+      <div class="sf"><span>summary</span><span class="stype">String</span></div>
+      <div class="sf"><span>totalDays</span><span class="stype">Int</span></div>
+      <div class="sf"><span class="fk">milestones[]</span><span class="stype">Milestone[]</span></div>
+    </div>
+    <div class="st">
+      <div class="st-head" style="background:rgba(246,173,85,0.1);color:var(--orange)">📍 Milestone</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK</span></div>
+      <div class="sf"><span class="fk">roadmapId</span><span class="stype">FK → Roadmap</span></div>
+      <div class="sf"><span>title</span><span class="stype">String</span></div>
+      <div class="sf"><span>orderIndex</span><span class="stype">Int</span></div>
+      <div class="sf"><span class="fk">dailyTasks[]</span><span class="stype">DailyTask[]</span></div>
+    </div>
+    <div class="st">
+      <div class="st-head" style="background:rgba(118,228,247,0.1);color:var(--cyan)">📋 DailyTask</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK</span></div>
+      <div class="sf"><span class="fk">milestoneId</span><span class="stype">FK → Milestone</span></div>
+      <div class="sf"><span>dayNumber</span><span class="stype">Int</span></div>
+      <div class="sf"><span>title</span><span class="stype">String</span></div>
+      <div class="sf"><span>resourceUrl</span><span class="stype">String?</span></div>
+      <div class="sf"><span>estimatedMins</span><span class="stype">Int · 30</span></div>
+      <div class="sf"><span style="color:var(--red)">difficulty</span><span class="stype">EASY/MED/HARD</span></div>
+      <div class="sf"><span style="color:var(--green)">isCompleted</span><span class="stype">Boolean · false</span></div>
+      <div class="sf"><span>completedAt</span><span class="stype">DateTime?</span></div>
+    </div>
+    <div class="st">
+      <div class="st-head" style="background:rgba(252,129,129,0.1);color:var(--red)">📊 UserProgress</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK</span></div>
+      <div class="sf"><span class="fk">taskId</span><span class="stype">FK → DailyTask</span></div>
+      <div class="sf"><span>userFeedback</span><span class="stype">EASY/MEDIUM/HARD</span></div>
+      <div class="sf"><span>createdAt</span><span class="stype">DateTime</span></div>
+    </div>
+    <div class="st">
+      <div class="st-head" style="background:rgba(183,148,244,0.1);color:var(--purple)">🔔 NotificationLog</div>
+      <div class="sf"><span class="pk">id: UUID</span><span class="stype">PK</span></div>
+      <div class="sf"><span class="fk">userId</span><span class="stype">FK → User</span></div>
+      <div class="sf"><span>channel</span><span class="stype">EMAIL/WHATSAPP</span></div>
+      <div class="sf"><span>status</span><span class="stype">SENT/FAILED</span></div>
+      <div class="sf"><span>sentAt</span><span class="stype">DateTime</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- REDIS KEY SCHEMA -->
+<div id="redis">
+  <div class="section-title reveal">Redis 7 — Key Schema &amp; Queue Design</div>
+  <div class="card reveal" style="margin-bottom:48px;padding:0;overflow:hidden">
+    <table class="rtable">
+      <thead><tr><th>Key / Queue</th><th>Type</th><th>TTL</th><th>Function</th><th>Owner</th></tr></thead>
+      <tbody>
+        <tr><td><span class="cp">roadmap:cache:&lt;SHA256&gt;</span></td><td><span class="tag" style="background:rgba(99,179,237,0.1);color:var(--blue);border-color:var(--blue)">String JSON</span></td><td style="color:var(--green)">7 Days (604800s)</td><td>Caches AI roadmaps. Saves &gt;70% LLM cost. Returns in &lt;15ms on hit.</td><td style="color:var(--text-muted)">AI Orchestrator</td></tr>
+        <tr><td><span class="cp">user:streak:&lt;user_id&gt;</span></td><td><span class="tag" style="background:rgba(104,211,145,0.1);color:var(--green);border-color:var(--green)">String Int</span></td><td style="color:var(--text-muted)">No Expiry</td><td>Fast O(1) streak lookup without hitting Postgres on every task completion.</td><td style="color:var(--text-muted)">Core Service</td></tr>
+        <tr><td><span class="cp">ratelimit:&lt;user_id&gt;</span></td><td><span class="tag" style="background:rgba(246,173,85,0.1);color:var(--orange);border-color:var(--orange)">String Int</span></td><td style="color:var(--orange)">60 Seconds</td><td>Token-Bucket rate limiter. Max 10 req/min per user. Atomic INCR+EXPIRE.</td><td style="color:var(--text-muted)">API Gateway</td></tr>
+        <tr><td><span class="cp">daily_reminder_queue</span></td><td><span class="tag" style="background:rgba(252,129,129,0.1);color:var(--red);border-color:var(--red)">BullMQ Queue</span></td><td style="color:var(--text-muted)">Persistent</td><td>Holds notification job payloads. Worker consumes async. Supports auto-retry &amp; dead-letter.</td><td style="color:var(--text-muted)">Gateway + Worker</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- API CONTRACTS -->
+<div id="api">
+  <div class="section-title reveal">API Contracts</div>
+  <div class="card reveal" style="margin-bottom:48px">
+    <div class="api-row"><div><div class="method mpost">POST</div></div><div><div class="api-path">/api/v1/goals/generate</div><div class="api-desc">Generate AI roadmap. Body: {title, targetDays, dailyHours, skillLevel} → 201 {goalId, cached, roadmap{summary, milestones[]}}</div></div></div>
+    <div class="api-row"><div><div class="method mpost">POST</div></div><div><div class="api-path">/api/v1/tasks/:taskId/complete</div><div class="api-desc">Mark task done + update streaks. Body: {feedback:"EASY"} → 200 {success, currentStreak, longestStreak, streakUpdated}</div></div></div>
+    <div class="api-row"><div><div class="method mpost">POST</div></div><div><div class="api-path">/api/v1/goals/:goalId/re-adapt</div><div class="api-desc">Adaptive schedule shift. Body: {reason} → 200 Recalculated future tasks. Completed history untouched.</div></div></div>
+    <div class="api-row"><div><div class="method mget">GET</div></div><div><div class="api-path">/api/v1/goals/:goalId/roadmap</div><div class="api-desc">Fetch full roadmap with milestones and daily tasks → 200 {roadmap}</div></div></div>
+    <div class="api-row"><div><div class="method mpost">POST</div></div><div><div class="api-path">/ai/v1/generate-roadmap</div><div class="api-desc">Internal: FastAPI → triggers LangGraph StateGraph pipeline. Returns structured roadmap JSON.</div></div></div>
+    <div class="api-row"><div><div class="method mpost">POST</div></div><div><div class="api-path">/ai/v1/re-adapt-schedule</div><div class="api-desc">Internal: AI re-adaptation endpoint → returns recalculated task schedule for future uncompleted tasks.</div></div></div>
+  </div>
+</div>
+
+<!-- LAYERED CLEAN ARCHITECTURE -->
+<div id="layers">
+  <div class="section-title reveal">Layered Clean Architecture — roadmap-core-service</div>
+  <div class="card reveal" style="margin-bottom:48px">
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:16px">Request flows strictly top-down. No layer skips allowed. No business logic in controllers. No Prisma calls in services.</p>
+    <div class="layer-stack">
+      <div class="layer-row" style="border-color:var(--orange);background:rgba(246,173,85,0.07)">
+        <div style="font-size:16px">🌐</div>
+        <div class="l-name" style="color:var(--orange)">routes/</div>
+        <div class="l-desc">Maps HTTP verb + path to controller handler. Zero logic.</div>
+        <div class="l-file" style="color:var(--orange)">roadmapRoutes.js</div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted)">⬇ req, res, next</div>
+      <div class="layer-row" style="border-color:var(--blue);background:rgba(99,179,237,0.07)">
+        <div style="font-size:16px">🎮</div>
+        <div class="l-name" style="color:var(--blue)">controller/</div>
+        <div class="l-desc">Extract params &amp; body → validate HTTP input → call service → return JSON. HTTP concerns only.</div>
+        <div class="l-file" style="color:var(--blue)">roadmapController.js</div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted)">⬇ domain objects</div>
+      <div class="layer-row" style="border-color:var(--purple);background:rgba(183,148,244,0.07)">
+        <div style="font-size:16px">⚙️</div>
+        <div class="l-name" style="color:var(--purple)">services/</div>
+        <div class="l-desc">Core business logic — streak calculation, schedule shift math, task orchestration. Calls repositories only.</div>
+        <div class="l-file" style="color:var(--purple)">roadmapService.js</div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted)">⬇ Prisma queries</div>
+      <div class="layer-row" style="border-color:var(--green);background:rgba(104,211,145,0.07)">
+        <div style="font-size:16px">🗄️</div>
+        <div class="l-name" style="color:var(--green)">repositories/</div>
+        <div class="l-desc">Data Access Layer (DAL). Direct Prisma ORM queries and $transaction blocks. Zero business logic.</div>
+        <div class="l-file" style="color:var(--green)">roadmapRepository.js</div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted)">⬇ PrismaClient singleton</div>
+      <div class="layer-row" style="border-color:var(--red);background:rgba(252,129,129,0.07)">
+        <div style="font-size:16px">🔌</div>
+        <div class="l-name" style="color:var(--red)">config/</div>
+        <div class="l-desc">PrismaClient singleton (connection pooling), Redis client, ENV vars loading via dotenv.</div>
+        <div class="l-file" style="color:var(--red)">prisma.js · redis.js</div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted)">⬇ SQL over TCP</div>
+      <div class="layer-row" style="border-color:var(--text-muted);background:rgba(255,255,255,0.02)">
+        <div style="font-size:16px">🐘</div>
+        <div class="l-name" style="color:var(--text-muted)">PostgreSQL 16</div>
+        <div class="l-desc">Persistent relational storage. Cascade deletes on all FK relations. Atomic transactions.</div>
+        <div class="l-file" style="color:var(--text-muted)">:5432</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px"><div style="color:var(--cyan);font-weight:700;margin-bottom:3px">middleware/</div><div style="color:var(--text-muted)">JWT Auth · Rate Limit · Error Handler · CORS</div></div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px"><div style="color:var(--cyan);font-weight:700;margin-bottom:3px">utils/</div><div style="color:var(--text-muted)">AppError class · Response formatters · Date math</div></div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px"><div style="color:var(--cyan);font-weight:700;margin-bottom:3px">models/</div><div style="color:var(--text-muted)">DTOs · Interfaces · Prisma type extensions</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TECH STACK -->
+<div id="techstack">
+  <div class="section-title reveal">Complete Tech Stack Matrix</div>
+  <div class="tech-grid reveal">
+    <div class="tech-card"><div class="tc-icon">⚛️</div><div class="tc-name">React 18 + Vite</div><div class="tc-role">Ultra-fast SPA. Component ecosystem with Tailwind + Lucide Icons + React Flow node graphs.</div><div class="tc-pkg">react · vite · tailwindcss · @xyflow/react</div></div>
+    <div class="tech-card"><div class="tc-icon">🛡️</div><div class="tc-name">Node.js + Express</div><div class="tc-role">API Gateway — reverse proxy, JWT auth, Helmet security headers, CORS policy enforcement.</div><div class="tc-pkg">express · jsonwebtoken · helmet</div></div>
+    <div class="tech-card"><div class="tc-icon">🐍</div><div class="tc-name">Python 3.12 + FastAPI</div><div class="tc-role">AI Orchestrator async REST API with auto-generated OpenAPI docs. Pydantic type validation.</div><div class="tc-pkg">fastapi · uvicorn · pydantic</div></div>
+    <div class="tech-card"><div class="tc-icon">🕸️</div><div class="tc-name">LangGraph</div><div class="tc-role">StateGraph multi-agent orchestration. Conditional edges, self-correction loops, circuit breaker.</div><div class="tc-pkg">langgraph · langchain-google-genai</div></div>
+    <div class="tech-card"><div class="tc-icon">✨</div><div class="tc-name">Gemini 2.5 Flash</div><div class="tc-role">Google LLM with structured JSON output enforced by Pydantic BaseModel schemas.</div><div class="tc-pkg">gemini-2.5-flash · langchain</div></div>
+    <div class="tech-card"><div class="tc-icon">🐘</div><div class="tc-name">PostgreSQL 16 + Prisma</div><div class="tc-role">Type-safe ORM. Auto-generated client. Atomic $transaction for streak &amp; task writes.</div><div class="tc-pkg">@prisma/client · prisma</div></div>
+    <div class="tech-card"><div class="tc-icon">⚡</div><div class="tc-name">Redis 7 + BullMQ</div><div class="tc-role">Dual role: LRU cache (7-day TTL roadmaps) + persistent job queue for background notifications.</div><div class="tc-pkg">ioredis · bullmq</div></div>
+    <div class="tech-card"><div class="tc-icon">🐳</div><div class="tc-name">Docker Compose</div><div class="tc-role">Multi-container isolation. postgres-db + redis-broker on internal bridge network. Restart policies.</div><div class="tc-pkg">docker-compose.yml</div></div>
+    <div class="tech-card"><div class="tc-icon">📧</div><div class="tc-name">Nodemailer + WhatsApp</div><div class="tc-role">Dual-channel notification delivery from BullMQ worker. Email + WhatsApp micro-task nudges.</div><div class="tc-pkg">nodemailer · whatsapp-api</div></div>
+  </div>
+</div>
+
+<!-- TRADE-OFFS -->
+<div id="tradeoffs">
+  <div class="section-title reveal">Architectural Trade-offs &amp; Design Decisions</div>
+  <div class="card reveal" style="margin-bottom:48px;padding:0;overflow:hidden">
+    <table class="trtable">
+      <thead><tr><th>Decision</th><th>Chosen Approach</th><th>Alternative</th><th>Reasoning</th></tr></thead>
+      <tbody>
+        <tr><td style="font-weight:600;color:var(--text)">Architecture</td><td style="color:var(--green)">Microservices + Docker Compose</td><td style="color:var(--text-muted)">Monolith</td><td style="color:var(--text-muted)">Fault isolation; AI service in Python, backend in Node.js; independent scaling</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">AI Workflow</td><td style="color:var(--green)">LangGraph StateGraph</td><td style="color:var(--text-muted)">LCEL Linear Chain</td><td style="color:var(--text-muted)">Conditional routing + self-correction loops impossible in linear chains</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">Queue System</td><td style="color:var(--green)">Redis + BullMQ</td><td style="color:var(--text-muted)">Kafka / RabbitMQ</td><td style="color:var(--text-muted)">Redis already in stack. BullMQ provides job retries &amp; scheduling without extra infra</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">ORM Strategy</td><td style="color:var(--green)">Prisma ORM</td><td style="color:var(--text-muted)">Raw SQL / Sequelize</td><td style="color:var(--text-muted)">Type-safe auto-generated client, $transaction API, migration management</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">Caching</td><td style="color:var(--green)">SHA-256 hash-keyed Redis (7d TTL)</td><td style="color:var(--text-muted)">No cache / DB cache</td><td style="color:var(--text-muted)">Identical goal+params = identical roadmap. Saves &gt;70% LLM cost. &lt;15ms vs ~3.5s</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">Self-Correction</td><td style="color:var(--green)">Retry loop (max 2) + Circuit Breaker</td><td style="color:var(--text-muted)">Infinite retry</td><td style="color:var(--text-muted)">Balances output quality vs API cost. Prevents runaway spend.</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">Adaptive Re-scheduling</td><td style="color:var(--green)">Update future tasks ONLY</td><td style="color:var(--text-muted)">Regenerate full roadmap</td><td style="color:var(--text-muted)">Preserves completed history for streak integrity. No extra LLM cost.</td></tr>
+        <tr><td style="font-weight:600;color:var(--text)">Rate Limiting</td><td style="color:var(--green)">Redis Token Bucket (10 req/min)</td><td style="color:var(--text-muted)">In-memory limiter</td><td style="color:var(--text-muted)">Stateless, distributed across restarts. Atomic INCR+EXPIRE avoids race conditions.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- NFRs -->
+<div id="nfr">
+  <div class="section-title reveal">Non-Functional Requirements (NFRs)</div>
+  <div class="nfr-grid">
+    <div class="nfr-card reveal">
+      <div class="nfr-title">⚡ Performance</div>
+      <ul class="nfr-list">
+        <li>Cached roadmap: &lt;15ms response</li>
+        <li>Fresh AI roadmap: ~3.5s end-to-end</li>
+        <li>Task completion endpoint: &lt;50ms</li>
+        <li>Redis streak lookup: O(1)</li>
+      </ul>
+    </div>
+    <div class="nfr-card reveal">
+      <div class="nfr-title">🛡️ Security</div>
+      <ul class="nfr-list">
+        <li>JWT Bearer Token auth at gateway</li>
+        <li>Helmet HTTP security headers</li>
+        <li>CORS origin whitelisting</li>
+        <li>bcrypt password hashing</li>
+        <li>Rate limit: 10 req/min per user</li>
+      </ul>
+    </div>
+    <div class="nfr-card reveal">
+      <div class="nfr-title">🔄 Resilience</div>
+      <ul class="nfr-list">
+        <li>Redis down → graceful cache bypass</li>
+        <li>Gemini error → circuit breaker fires</li>
+        <li>Worker crash → BullMQ auto-retry</li>
+        <li>Prisma $transaction rollback on fail</li>
+      </ul>
+    </div>
+    <div class="nfr-card reveal">
+      <div class="nfr-title">📈 Scalability</div>
+      <ul class="nfr-list">
+        <li>Each service scales independently</li>
+        <li>Redis caching cuts LLM calls &gt;70%</li>
+        <li>BullMQ worker horizontally scalable</li>
+        <li>Stateless gateway = load-balancer ready</li>
+      </ul>
+    </div>
+    <div class="nfr-card reveal">
+      <div class="nfr-title">🏗️ Maintainability</div>
+      <ul class="nfr-list">
+        <li>Strict 4-layer clean architecture</li>
+        <li>Prompts separated from LangGraph nodes</li>
+        <li>Pydantic schemas enforce AI contract</li>
+        <li>AppError middleware centralised</li>
+      </ul>
+    </div>
+    <div class="nfr-card reveal">
+      <div class="nfr-title">💰 Cost Efficiency</div>
+      <ul class="nfr-list">
+        <li>&gt;70% Gemini API cost saved via cache</li>
+        <li>LangGraph retry cap: max 2 attempts</li>
+        <li>BullMQ batches notifications async</li>
+        <li>Alpine Docker images = minimal RAM</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer reveal">
+  <div style="font-size:24px;margin-bottom:8px">🚀</div>
+  <div style="font-weight:700;color:var(--text);margin-bottom:4px">PathPilot AI — High-Level System Design</div>
+  <div>5 Microservices · LangGraph Multi-Agent · Redis 7 · PostgreSQL 16 · Gemini 2.5 Flash · Docker Compose</div>
+  <div style="margin-top:8px;color:var(--text-muted);font-size:10px;letter-spacing:1px">STANDALONE HTML — NO SERVER NEEDED · OPEN DIRECTLY IN ANY BROWSER</div>
+</div>
+
+</div>
+
+<script>
+const obs = new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('visible')})},{threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+const secs=document.querySelectorAll('[id]');
+const links=document.querySelectorAll('.nav a');
+window.addEventListener('scroll',()=>{
+  let cur='';
+  secs.forEach(s=>{if(window.scrollY>=s.offsetTop-120)cur=s.id});
+  links.forEach(a=>{const active=a.getAttribute('href')==='#'+cur;a.style.color=active?'var(--blue)':'';a.style.background=active?'rgba(99,179,237,0.1)':''});
+});
+</script>
+</body>
+</html>
